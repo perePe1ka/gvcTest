@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Railway administrations</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+
+<h1>Railway administrations</h1>
+
+<div id="searchBox">
+    <input type="number" id="searchCode" placeholder="Code…" min="1">
+    <button id="searchBtn">Find</button>
+    <button id="clearSearchBtn" hidden>Clear</button>
+</div>
+
+<table id="adminsTable">
+    <thead>
+    <tr>
+        <th>Code</th>
+        <th>Full&nbsp;name</th>
+        <th>Abbr</th>
+        <th>Actions</th>
+    </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<h2 id="formTitle">Add new administration</h2>
+
+<form id="adminForm">
+    <label>Code:
+        <input type="number" id="codeJa" required>
+    </label>
+
+    <label>Full name:
+        <input type="text" id="fullNameJa" required>
+    </label>
+
+    <label>Abbr:
+        <input type="text" id="abbrJa" required maxlength="10">
+    </label>
+
+    <button type="submit">Save</button>
+    <button type="button" id="cancelBtn" hidden>Cancel</button>
+</form>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    const apiRoot = /*[[@{/api/v1/admins}]]*/ '';
+
+    const tableBody      = document.querySelector('#adminsTable tbody');
+    const form           = document.getElementById('adminForm');
+    const cancelBtn      = document.getElementById('cancelBtn');
+    const formTitle      = document.getElementById('formTitle');
+
+    const searchBtn      = document.getElementById('searchBtn');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    const searchInput    = document.getElementById('searchCode');
+
+    let editingId = null;
+
+    /* ---------- helpers ---------- */
+    function renderRows(list) {
+        tableBody.innerHTML = '';
+        list.forEach(a => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+          <td>${a.codeJa}</td>
+          <td>${a.fullNameJa}</td>
+          <td>${a.abbrJa}</td>
+          <td>
+              <button onclick="editAdmin(${a.codeJa})">Edit</button>
+              <button onclick="deleteAdmin(${a.codeJa})">Delete</button>
+          </td>`;
+            tableBody.appendChild(tr);
+        });
+    }
+
+    function loadAdmins() {
+        fetch(apiRoot)
+            .then(r => r.json())
+            .then(renderRows)
+            .then(() => clearSearchBtn.hidden = true);
+    }
+
+    function loadOne(id) {
+        fetch(apiRoot + '/' + id)
+            .then(r => r.ok ? r.json() : Promise.reject(r.status))
+            .then(a => renderRows([a]))
+            .then(() => clearSearchBtn.hidden = false)
+            .catch(() => alert('Admin with code ' + id + ' not found'));
+    }
+
+    function editAdmin(id) {
+        fetch(apiRoot + '/' + id)
+            .then(r => r.json())
+            .then(a => {
+                codeJa.value      = a.codeJa;
+                fullNameJa.value  = a.fullNameJa;
+                abbrJa.value      = a.abbrJa;
+
+                editingId         = id;
+                codeJa.readOnly   = true;
+                formTitle.textContent = 'Edit administration';
+                cancelBtn.hidden  = false;
+            });
+    }
+
+    function deleteAdmin(id) {
+        if (!confirm('Delete administration ' + id + '?')) return;
+        fetch(apiRoot + '/' + id, {method: 'DELETE'})
+            .then(() => loadAdmins());
+    }
+
+    cancelBtn.addEventListener('click', resetForm);
+
+    form.addEventListener('submit', e => {
+        e.preventDefault();
+
+        const body = {
+            codeJa:     +codeJa.value,
+            fullNameJa:  fullNameJa.value,
+            abbrJa:      abbrJa.value
+        };
+
+        const method = editingId ? 'PUT' : 'POST';
+        const url    = editingId ? apiRoot + '/' + editingId : apiRoot;
+
+        fetch(url, {
+            method,
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        })
+            .then(r => r.ok ? r.json() : Promise.reject(r.status))
+            .then(resetForm)
+            .then(loadAdmins)
+            .catch(s => alert('Error ' + s));
+    });
+
+    function resetForm() {
+        form.reset();
+        editingId        = null;
+        codeJa.readOnly  = false;
+        formTitle.textContent = 'Add new administration';
+        cancelBtn.hidden = true;
+    }
+
+    searchBtn.addEventListener('click', () => {
+        const id = +searchInput.value.trim();
+        if (id) loadOne(id);
+    });
+
+    clearSearchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        loadAdmins();
+    });
+
+    loadAdmins();
+    /*]]>*/
+</script>
+</body>
+</html>
